@@ -5,11 +5,12 @@ dotenv.config();
 
 (async function() {
   cloudinary.config({ 
-    cloud_name: 'dpttzjwpr', 
+    cloud_name: process.env.REACT_APP_CLOUDINARY_CLOUD_NAME, 
     api_key: process.env.CLOUDINARY_API_KEY, 
     api_secret: process.env.CLOUDINARY_API_SECRET
   });
 
+     
   try {
     const uploadResult = await cloudinary.uploader.upload(
       'https://image.slidesharecdn.com/pdftestfile-140527184544-phpapp02/95/pdf-test-file-2-638.jpg?cb=1401216363',

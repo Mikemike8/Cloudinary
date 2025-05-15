@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
 
-const App = () => {
+import dotenv from 'dotenv'
+import { useState, useEffect } from 'react';
+
+dotenv.config();
+
+const DebtorForm = () => {
   const [documentUrl, setDocumentUrl] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
@@ -23,16 +27,16 @@ const App = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleUpload = () => {
+  const handleUpload = (e) => {
+    e.preventDefault(); // Prevent any default behavior
     if (!formData.fullName || !formData.companyName) {
       setUploadStatus('Please fill in all required fields (Full Name and Company Name).');
       return;
     }
 
-    const cloudName = 'dpttzjwpr'; // Your Cloudinary cloud name
-    const uploadPreset = 'PDFDATA'; // Your unsigned upload preset
-
-    // Ensure metadata fields are strings
+  const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME; 
+  const uploadPreset = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET; 
+    
     const metadata = {
       fullName: String(formData.fullName).trim(),
       companyName: String(formData.companyName).trim(),
@@ -43,45 +47,57 @@ const App = () => {
       {
         cloudName: cloudName,
         uploadPreset: uploadPreset,
-        sources: ['local'], // Allow local file uploads (add 'url', 'dropbox', etc., if needed)
+        sources: ['local'], // Allow local file uploads
         multiple: false, // Allow only one file
         resourceType: 'auto', // Supports PDF, images, etc.
         clientAllowedFormats: ['pdf', 'jpg', 'jpeg', 'png'], // Match your accept attribute
-        // Option 1: Use metadata (requires fields defined in Cloudinary)
         metadata: {
           fullName: metadata.fullName,
           companyName: metadata.companyName,
         },
-        // Option 2: Use context (uncomment to use, no Cloudinary metadata configuration needed)
-        /*
-        context: {
-          fullName: encodeURIComponent(metadata.fullName),
-          companyName: encodeURIComponent(metadata.companyName),
-        },
-        */
       },
       (error, result) => {
         if (error) {
           console.error('Upload error:', error);
-          setUploadStatus(`An error occurred while uploading: ${error.message || 'Unknown error'}`);
+          setUploadStatus(`Failed to upload file: ${error.message || 'Unknown error. Please try again.'}`);
           return;
         }
 
         if (result && result.event === 'success') {
-          console.log('Upload result:', result.info);
-          setDocumentUrl(result.info.secure_url);
-          setUploadStatus('File uploaded successfully!');
+          const { secure_url, original_filename } = result.info;
+          console.log('Upload result:', { url: secure_url, fileName: original_filename });
+          setDocumentUrl(secure_url);
+          setUploadStatus(`File "${original_filename}" uploaded successfully!`);
+
+          // Automatically submit the form after successful upload
+          if (formData.fullName && formData.companyName && secure_url) {
+            console.log('Form submitted:', {
+              fullName: formData.fullName,
+              companyName: formData.companyName,
+              documentUrl: secure_url,
+            });
+            setUploadStatus('Form submitted successfully!');
+            setFormData({ fullName: '', companyName: '' });
+            setDocumentUrl('');
+          } else {
+            setUploadStatus('Form submission failed: Missing required fields.');
+          }
         } else if (result && result.event === 'error') {
           console.error('Upload failed:', result.info);
-          setUploadStatus(`Upload failed: ${result.info?.message || 'Unknown error'}`);
+          const errorMessage = result.info?.message || 'Unknown error';
+          const friendlyMessage =
+            errorMessage.includes('File size') ? 'File is too large. Maximum size is 10MB.' :
+            errorMessage.includes('Invalid format') ? 'Invalid file format. Please upload PDF, JPG, or PNG.' :
+            `Upload failed: ${errorMessage}`;
+          setUploadStatus(friendlyMessage);
         }
       }
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-12">
+    <div className="min-h-screen w-full bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full mx-auto space-y-12">
         <section className="text-center p-0 m-0 bg-gray-100">
           <h1 className="text-[60px] font-oswald mb-6 text-slate-800 tracking-wide">
             Submit a Debtor
@@ -92,12 +108,12 @@ const App = () => {
           </p>
         </section>
 
-        <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-[1500px]">
+        <div className="bg-white rounded-xl shadow-lg p-8 w-full">
           <h1 className="text-5xl font-oswald text-[#222222] mb-6 border-b-2 border-[#222222] pb-4">
             Freight Claim Recovery Submission
           </h1>
 
-          <div className="space-y-6">
+          <form className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name*
@@ -145,7 +161,7 @@ const App = () => {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
+                    d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m-4-4l4-4 4 4"
                   />
                 </svg>
                 Upload File
@@ -154,11 +170,11 @@ const App = () => {
                 Required: Bill of Lading, Rate Confirmation, Invoice (PDF/JPEG/PNG)
               </p>
             </div>
-          </div>
+          </form>
 
           {uploadStatus && (
             <div className="mt-4">
-              <p className={`text-${uploadStatus.includes('success') ? 'green' : 'red'}-600`}>
+              <p className={`text-${uploadStatus.includes('successfully') ? 'green' : 'red'}-600`}>
                 {uploadStatus}
               </p>
             </div>
@@ -178,4 +194,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default DebtorForm;
