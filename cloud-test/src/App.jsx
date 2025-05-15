@@ -1,47 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const App = () => {
-const [selectedFile, setSelectedFile] = useState(null);
   const [documentUrl, setDocumentUrl] = useState('');
+  const [formData, setFormData] = useState({
+    fullName: '',
+    companyName: '',
+  });
+  const [uploadStatus, setUploadStatus] = useState('');
 
-  const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
+  // Load Cloudinary Upload Widget script dynamically
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://widget.cloudinary.com/v2.0/global/all.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!selectedFile) {
-      alert('Please select a file to upload.');
+  const handleUpload = () => {
+    if (!formData.fullName || !formData.companyName) {
+      setUploadStatus('Please fill in all required fields (Full Name and Company Name).');
       return;
     }
 
-    const cloudName = 'dpttzjwpr'; // Replace with your Cloudinary cloud name
-    const uploadPreset = 'PDFDATA'; // Replace with your unsigned upload preset
+    const cloudName = 'dpttzjwpr'; // Your Cloudinary cloud name
+    const uploadPreset = 'PDFDATA'; // Your unsigned upload preset
 
-    const formDataToUpload = new FormData();
-    formDataToUpload.append('file', selectedFile);
-    formDataToUpload.append('upload_preset', uploadPreset);
+    // Ensure metadata fields are strings
+    const metadata = {
+      fullName: String(formData.fullName).trim(),
+      companyName: String(formData.companyName).trim(),
+    };
 
-    try {
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-        method: 'POST',
-        body: formDataToUpload,
-      });
+    // Configure the Cloudinary Upload Widget
+    window.cloudinary.openUploadWidget(
+      {
+        cloudName: cloudName,
+        uploadPreset: uploadPreset,
+        sources: ['local'], // Allow local file uploads (add 'url', 'dropbox', etc., if needed)
+        multiple: false, // Allow only one file
+        resourceType: 'auto', // Supports PDF, images, etc.
+        clientAllowedFormats: ['pdf', 'jpg', 'jpeg', 'png'], // Match your accept attribute
+        // Option 1: Use metadata (requires fields defined in Cloudinary)
+        metadata: {
+          fullName: metadata.fullName,
+          companyName: metadata.companyName,
+        },
+        // Option 2: Use context (uncomment to use, no Cloudinary metadata configuration needed)
+        /*
+        context: {
+          fullName: encodeURIComponent(metadata.fullName),
+          companyName: encodeURIComponent(metadata.companyName),
+        },
+        */
+      },
+      (error, result) => {
+        if (error) {
+          console.error('Upload error:', error);
+          setUploadStatus(`An error occurred while uploading: ${error.message || 'Unknown error'}`);
+          return;
+        }
 
-      const data = await response.json();
-
-      if (data.secure_url) {
-        setDocumentUrl(data.secure_url);
-        alert('File uploaded successfully!');
-        // Proceed with further actions, e.g., sending the URL to your backend
-      } else {
-        alert('Failed to upload the document.');
+        if (result && result.event === 'success') {
+          console.log('Upload result:', result.info);
+          setDocumentUrl(result.info.secure_url);
+          setUploadStatus('File uploaded successfully!');
+        } else if (result && result.event === 'error') {
+          console.error('Upload failed:', result.info);
+          setUploadStatus(`Upload failed: ${result.info?.message || 'Unknown error'}`);
+        }
       }
-    } catch (error) {
-      console.error('Error uploading the document:', error);
-      alert('An error occurred while uploading the document.');
-    }
+    );
   };
 
   return (
@@ -62,47 +97,72 @@ const [selectedFile, setSelectedFile] = useState(null);
             Freight Claim Recovery Submission
           </h1>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Document Upload */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name*
+              </label>
+              <input
+                type="text"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company Name*
+              </label>
+              <input
+                type="text"
+                name="companyName"
+                value={formData.companyName}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                required
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload Documentation*
               </label>
-              <div className="mt-1">
-                <input
-                  type="file"
-                  name="documentFile"
-                  onChange={handleFileChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  required
-                />
-                <p className="text-xs mt-1 text-gray-600">
-                  Required: Bill of Lading, Rate Confirmation, Invoice (PDF/JPEG/PNG)
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-[#1a1a1a] text-white py-4 px-6 rounded-lg shadow-lg hover:bg-[#333333] transition-all duration-300 font-semibold text-lg flex items-center justify-center"
-            >
-              <svg
-                className="w-5 h-5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
+              <button
+                type="button"
+                onClick={handleUpload}
+                className="w-full bg-[#1a1a1a] text-white py-4 px-6 rounded-lg shadow-lg hover:bg-[#333333] transition-all duration-300 font-semibold text-lg flex items-center justify-center"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Initiate Recovery Process
-            </button>
-          </form>
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                Upload File
+              </button>
+              <p className="text-xs mt-1 text-gray-600">
+                Required: Bill of Lading, Rate Confirmation, Invoice (PDF/JPEG/PNG)
+              </p>
+            </div>
+          </div>
+
+          {uploadStatus && (
+            <div className="mt-4">
+              <p className={`text-${uploadStatus.includes('success') ? 'green' : 'red'}-600`}>
+                {uploadStatus}
+              </p>
+            </div>
+          )}
 
           {documentUrl && (
             <div className="mt-4">
